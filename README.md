@@ -36,7 +36,7 @@ require'npm_scripts'.setup(opts)
 
 ### opts.select
 
-Function. By default set to `vim.ui.select`. You can provide a custom function with the same signature(see `:help vim.ui.select`) or use a 3rd party solution like [`telescope-ui-select.nvim`](https://github.com/nvim-telescope/telescope-ui-select.nvim) to override global `vim.ui.select` and have your favorite picker everywhere.
+Function. By default set to `vim.ui.select`. You can provide a custom function with the same signature(see `:help vim.ui.select`) or use a 3rd party solution like [`stevearc/dressing.nvim`](https://github.com/stevearc/dressing.nvim) for [`telescope`](https://github.com/nvim-telescope/telescope.nvim), [`fzf`](https://github.com/junegunn/fzf), [`fzf-lua`](https://github.com/ibhagwan/fzf-lua) support, or [`telescope-ui-select.nvim`](https://github.com/nvim-telescope/telescope-ui-select.nvim) to override global `vim.ui.select` and have your favorite picker everywhere.
 
 ### opts.package_manager
 
@@ -70,6 +70,7 @@ Function. Default `tostring`
 - [x] buffer workspace picker support
 - [x] global options setup
 - [x] local options
+- [x] fzf integration readme example
 - [ ] vim docs
-- [ ] fzf integration readme example
 - [ ] tmux run_script example
+- [ ] `quiet` option ie run script in background
