@@ -31,8 +31,8 @@ require'npm_scripts'.setup(opts)
 ## API
 
 - `require'npm_scripts'.run_script()` to run a script from a root `package.json`
-- `require'npm_scripts'.run_workspace_script()` to pick a workspace and script to run
-- `require'npm_scripts'.run_buffer_workspace_script()` infers a workspace from a current buffer and runs a script
+- `require'npm_scripts'.run_workspace_script()` Execute a script in a workspace
+- `require'npm_scripts'.run_buffer_script()` Find current buffer's closest package.json and executes a script from it
 
 ### opts.select
 
@@ -61,6 +61,12 @@ String. Default `"Select a workspace to run a script:"`
 ### opts.select_workspace_format_item
 
 Function. Default `tostring`
+
+### opts.workspace_script_solo_picker
+
+Boolean. Default `true`
+
+Whether to pick a workspace script via a single search or two searches, over workspaces and picked workspace scripts
 
 ## TODO
 

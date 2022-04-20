@@ -8,6 +8,10 @@ local DEFAULT_OPTIONS = {
     select_workspace_format_item = tostring,
 
     package_manager = "npm",
+
+    -- whether to pick a workspace script via a single search
+    -- or two searches, over workspaces and picked workspace scripts
+    workspace_script_solo_picker = true,
     -- opts.script_name string
     -- opts.path string where command should be executed
     -- opts.package_manager string the binary to run the script ie 'npm' | 'yarn'
@@ -160,34 +164,56 @@ function M.run_workspace_script(opts)
         end
     end
 
-    opts.select(vim.fn.keys(workspaces), {
-        prompt = opts.select_workspace_prompt,
-        kind = "string",
-        format_item = opts.select_workspace_format_item,
-    }, function(workspace_name)
-        local workspace_scripts = workspaces[workspace_name].json.scripts
-
-        if workspace_scripts == nil or #vim.fn.keys(workspace_scripts) == 0 then
-            print('No "scripts" in workspace package.json')
-            return nil
+    if opts.workspace_script_solo_picker then
+        local items = {}
+        for workspace_name, w in pairs(workspaces) do
+            for script_name, _ in pairs(w.json.scripts or {}) do
+                table.insert(items, workspace_name..'  '..script_name)
+            end
         end
 
-        opts.select(vim.fn.keys(workspace_scripts), {
-            prompt = opts.select_script_prompt,
-            kind = "string",
-            format_item = opts.select_script_format_item,
-        }, function(name)
+        opts.select(items, {
+            prompt = opts.select_script_prompt
+        }, function(picked)
+            local parsed_picked = vim.split(picked, '  ')
+            local workspace_name = parsed_picked[1]
+            local script_name = parsed_picked[2]
             opts.run_script({
-                name = name,
+                name = script_name,
                 path = workspaces[workspace_name].filepath,
                 package_manager = opts.package_manager,
             })
         end)
-    end)
+    else
+        opts.select(vim.fn.keys(workspaces), {
+            prompt = opts.select_workspace_prompt,
+            kind = "string",
+            format_item = opts.select_workspace_format_item,
+        }, function(workspace_name)
+            local workspace_scripts = workspaces[workspace_name].json.scripts
+
+            if workspace_scripts == nil or #vim.fn.keys(workspace_scripts) == 0 then
+                print('No "scripts" in workspace package.json')
+                return nil
+            end
+
+            opts.select(vim.fn.keys(workspace_scripts), {
+                prompt = opts.select_script_prompt,
+                kind = "string",
+                format_item = opts.select_script_format_item,
+            }, function(name)
+                opts.run_script({
+                    name = name,
+                    path = workspaces[workspace_name].filepath,
+                    package_manager = opts.package_manager,
+                })
+            end)
+        end)
+    end
 end
 
 -- run a script from workspace's package.json
-function M.run_buffer_workspace_script(opts)
+function M.run_buffer_script(opts)
     opts = utils.get_opts(opts or {})
 
     local config = utils.get_closest_package_json()
