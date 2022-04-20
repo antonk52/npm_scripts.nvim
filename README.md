@@ -6,7 +6,7 @@ Features:
 
 - Workspace support
 - Run a script from the current buffer's project(monorepo)
-- Uses `vim.ui.select()` for a picker which makes it easy to seamlessly integrate with your setup(telescope/fzf or anything else), see [`opts.select`](#opts.select)
+- Uses `vim.ui.select()` for a picker which makes it easy to seamlessly integrate with your setup(telescope/fzf or anything else). See [`opts.select`](#opts.select)
 
 ## Install
 
@@ -77,6 +77,6 @@ Whether to pick a workspace script via a single search or two searches, over wor
 - [x] global options setup
 - [x] local options
 - [x] fzf integration readme example
-- [ ] vim docs
+- [x] vim docs
 - [ ] tmux run_script example
 - [ ] `quiet` option ie run script in background

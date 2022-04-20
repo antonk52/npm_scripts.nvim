@@ -16,7 +16,7 @@ local DEFAULT_OPTIONS = {
     -- opts.path string where command should be executed
     -- opts.package_manager string the binary to run the script ie 'npm' | 'yarn'
     run_script = function(opts)
-        vim.cmd("vs | term cd " .. opts.path .. "&& " .. opts.package_manager .. " run " .. opts.name)
+        vim.cmd("vs | term cd " .. opts.path .. " && " .. opts.package_manager .. " run " .. opts.name)
     end,
 }
 local GLOBAL_OPTIONS = {}

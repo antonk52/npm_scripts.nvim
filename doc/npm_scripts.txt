@@ -1,0 +1,12 @@
+*npm_scripts.txt*  Search and execute npm scripts
+
+Author:  antonk52
+URL: https://github.com/antonk52/npm_scripts.nvim
+
+FEATURES
+                                                    *npm_scripts.run_script*
+Execute a script from a root package.json
+                                           *npm_scripts.run_workspace_script*
+Execute a script in a workspace
+                                              *npm_scripts.run_buffer_script*
+Find current buffer's closest package.json and executes a script from it
