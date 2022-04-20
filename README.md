@@ -8,6 +8,12 @@ Features:
 - Run a script from the current buffer's project(monorepo)
 - Uses `vim.ui.select()` for a picker which makes it easy to seamlessly integrate with your setup(telescope/fzf or anything else). See [`opts.select`](#opts.select)
 
+<center>
+
+![ezgif-1-6cc93e2db3](https://user-images.githubusercontent.com/5817809/164342100-04b889d5-a294-43b3-9530-f5ef3afd0ec1.gif)
+
+</center>
+
 ## Install
 
 ```vim
