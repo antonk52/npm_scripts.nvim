@@ -1,3 +1,8 @@
+---@class PackageJson
+---@field json table<string, string|table<string,string>>
+---@field filepath string
+
+---@class PluginOptions
 local DEFAULT_OPTIONS = {
     select = vim.ui.select,
 
@@ -22,9 +27,9 @@ local DEFAULT_OPTIONS = {
 local GLOBAL_OPTIONS = {}
 local M = {}
 
---- Override default plugin options
--- @param opts The replacement pattern.
--- @return opts
+---Override default plugin options
+---@param opts PluginOptions
+---@return nil
 function M.setup(opts)
     for k, v in pairs(opts) do
         GLOBAL_OPTIONS[k] = v
@@ -32,8 +37,9 @@ function M.setup(opts)
 end
 
 local utils = {}
---- Infer options
--- @return options
+---Infer options
+---@param local_options PluginOptions
+---@return PluginOptions
 function utils.get_opts(local_options)
     local result = {}
     for _, opts in ipairs({ DEFAULT_OPTIONS, GLOBAL_OPTIONS, local_options }) do
@@ -44,8 +50,9 @@ function utils.get_opts(local_options)
 
     return result
 end
--- returns string
--- closest directory to the argument
+---closest directory to the argument
+---@param path string
+---@return string
 function utils.dirname(path)
     if vim.fn.isdirectory(path) == 1 then
         return path
@@ -53,13 +60,14 @@ function utils.dirname(path)
     local parts = vim.split(path, "/")
     return table.concat(parts, "/", 1, #parts == 1 and 1 or #parts - 1)
 end
---- Get current buffer's closest directory
--- @return string
+
+---Get current buffer's closest directory
+---@return string
 function utils.buffer_cwd()
     local buf_path = vim.fn.expand("%")
     return utils.dirname(buf_path)
 end
--- @return `nil` or `{filepath = string, json = table}`
+---@return PackageJson|nil
 function utils.get_root_package_json()
     -- process cwd
     local cwd = vim.fn.getcwd()
@@ -76,7 +84,7 @@ function utils.get_root_package_json()
         json = vim.json.decode(content),
     }
 end
--- returns `nil` or `{filepath = string, json = table}`
+---@return PackageJson|nil
 function utils.get_closest_package_json()
     local cwd = utils.buffer_cwd()
     local paths = vim.split(cwd, "/")
@@ -95,7 +103,9 @@ function utils.get_closest_package_json()
     return nil
 end
 
--- run a script from project's package.json
+---Run a script from project's package.json
+---@param opts PluginOptions|nil
+---@return nil
 function M.run_script(opts)
     opts = utils.get_opts(opts or {})
 
@@ -129,6 +139,9 @@ function M.run_script(opts)
     end)
 end
 
+---Run a script from a specific workspace
+---@param opts PluginOptions|nil
+---@return nil
 function M.run_workspace_script(opts)
     opts = utils.get_opts(opts or {})
 
@@ -144,6 +157,7 @@ function M.run_workspace_script(opts)
     end
 
     -- { [name] = {filepath, json} }
+    ---@type table<string, PackageJson>
     local workspaces = {}
 
     for _, glob in pairs(root_config.json.workspaces) do
@@ -212,7 +226,9 @@ function M.run_workspace_script(opts)
     end
 end
 
--- run a script from workspace's package.json
+---Run a script from current buffer's package
+---@param opts PluginOptions|nil
+---@return nil
 function M.run_buffer_script(opts)
     opts = utils.get_opts(opts or {})
 
