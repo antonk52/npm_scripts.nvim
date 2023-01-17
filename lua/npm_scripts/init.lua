@@ -2,28 +2,6 @@
 ---@field json table<string, string|table<string,string>>
 ---@field filepath string
 
----@class PluginOptions
-local DEFAULT_OPTIONS = {
-    select = vim.ui.select,
-
-    select_script_prompt = "Select a script to run:",
-    select_script_format_item = tostring,
-
-    select_workspace_prompt = "Select a workspace to run a script:",
-    select_workspace_format_item = tostring,
-
-    package_manager = "npm",
-
-    -- whether to pick a workspace script via a single search
-    -- or two searches, over workspaces and picked workspace scripts
-    workspace_script_solo_picker = true,
-    -- opts.script_name string
-    -- opts.path string where command should be executed
-    -- opts.package_manager string the binary to run the script ie 'npm' | 'yarn'
-    run_script = function(opts)
-        vim.cmd("vs | term cd " .. opts.path .. " && " .. opts.package_manager .. " run " .. opts.name)
-    end,
-}
 local GLOBAL_OPTIONS = {}
 local M = {}
 
@@ -41,6 +19,28 @@ local utils = {}
 ---@param local_options PluginOptions
 ---@return PluginOptions
 function utils.get_opts(local_options)
+    ---@class PluginOptions
+    local DEFAULT_OPTIONS = {
+        select = vim.ui.select,
+
+        select_script_prompt = "Select a script to run:",
+        select_script_format_item = tostring,
+
+        select_workspace_prompt = "Select a workspace to run a script:",
+        select_workspace_format_item = tostring,
+
+        package_manager = "npm",
+
+        -- whether to pick a workspace script via a single search
+        -- or two searches, over workspaces and picked workspace scripts
+        workspace_script_solo_picker = true,
+        -- opts.script_name string
+        -- opts.path string where command should be executed
+        -- opts.package_manager string the binary to run the script ie 'npm' | 'yarn'
+        run_script = function(opts)
+            vim.cmd("vs | term cd " .. opts.path .. " && " .. opts.package_manager .. " run " .. opts.name)
+        end,
+    }
     local result = {}
     for _, opts in ipairs({ DEFAULT_OPTIONS, GLOBAL_OPTIONS, local_options }) do
         for k, v in pairs(opts) do
