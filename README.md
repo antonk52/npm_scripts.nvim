@@ -46,7 +46,7 @@ Function. By default set to `vim.ui.select`. You can provide a custom function w
 
 ### opts.package_manager
 
-String. Pick a package manager to use to run scripts. `npm` by default.
+String. Pick a package manager to use to run scripts. By default it searches for lock files and pick one of `bun`, `pnpm`, `yarn` or `npm`. If no lock files found fallbacks to `npm`.
 
 ### opts.run_script
 

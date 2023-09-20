@@ -29,14 +29,14 @@ function utils.get_opts(local_options)
         select_workspace_prompt = "Select a workspace to run a script:",
         select_workspace_format_item = tostring,
 
-        package_manager = "npm",
+        package_manager = local_options.package_manager or utils.infer_package_manager(),
 
         -- whether to pick a workspace script via a single search
         -- or two searches, over workspaces and picked workspace scripts
         workspace_script_solo_picker = true,
         -- opts.script_name string
         -- opts.path string where command should be executed
-        -- opts.package_manager string the binary to run the script ie 'npm' | 'yarn'
+        -- opts.package_manager string the binary to run the script ie 'npm' | 'yarn' | 'pnpm' | 'bun'
         run_script = function(opts)
             vim.cmd("vs | term cd " .. opts.path .. " && " .. opts.package_manager .. " run " .. opts.name)
         end,
@@ -90,7 +90,8 @@ function utils.get_closest_package_json()
     local paths = vim.split(cwd, "/")
 
     for i, _ in ipairs(paths) do
-        local filepath = table.concat(paths, "/", 1, #paths == 1 and 1 or #paths - i) .. "/package.json"
+        local startIndex = #paths == 1 and 1 or #paths - i
+        local filepath = table.concat(paths, "/", 1, startIndex) .. "/package.json"
         if vim.fn.file_readable(filepath) == 1 then
             local lines = vim.fn.readfile(filepath)
             return {
@@ -101,6 +102,31 @@ function utils.get_closest_package_json()
     end
 
     return nil
+end
+
+---@return 'npm' | 'yarn' | 'pnpm' | 'bun'
+function utils.infer_package_manager()
+    local cwd = utils.buffer_cwd()
+    local paths = vim.split(cwd, "/")
+
+    for i, _ in ipairs(paths) do
+        local startIndex = #paths == 1 and 1 or #paths - i
+        local filepath = table.concat(paths, "/", 1, startIndex)
+        if vim.fn.file_readable(filepath..'/package-lock.json') == 1 then
+            return 'npm'
+        end
+        if vim.fn.file_readable(filepath..'/yarn.lock') == 1 then
+            return 'yarn'
+        end
+        if vim.fn.file_readable(filepath..'/pnpm-lock.yaml') == 1 then
+            return 'pnpm'
+        end
+        if vim.fn.file_readable(filepath..'/bun.lockb') == 1 then
+            return 'bun'
+        end
+    end
+
+    return 'npm'
 end
 
 ---Run a script from project's package.json
