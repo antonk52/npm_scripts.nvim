@@ -39,6 +39,7 @@ require'npm_scripts'.setup(opts)
 - `require'npm_scripts'.run_script()` to run a script from a root `package.json`
 - `require'npm_scripts'.run_workspace_script()` Execute a script in a workspace
 - `require'npm_scripts'.run_buffer_script()` Find current buffer's closest package.json and executes a script from it
+- `require'npm_scripts'.run_from_all()` Find all package.json and select a script from a single list of `package.json#name`: `script_name`
 
 ### opts.select
 
