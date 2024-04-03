@@ -291,12 +291,8 @@ end
 function M.run_from_all(opts)
     opts = utils.get_opts(opts or {})
 
-    local obj = vim.system({ 'fd', '-t', 'f', 'package.json', '.' }, { text = true }):wait()
-    if obj.code ~= 0 then
-        vim.notify('fd failed', vim.log.levels.ERROR)
-        return nil
-    end
-    local out = vim.trim(obj.stdout)
+    local out = vim.fn.system({ 'fd', '-E', 'node_modules', '-t', 'f', 'package.json', '.' })
+    out = vim.trim(out)
     local lines = vim.split(out, '\n')
 
     local failed_to_parse = {}
