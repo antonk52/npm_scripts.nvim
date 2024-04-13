@@ -50,28 +50,19 @@ function utils.get_opts(local_options)
 
     return result
 end
----closest directory to the argument
----@param path string
----@return string
-function utils.dirname(path)
-    if vim.fn.isdirectory(path) == 1 then
-        return path
-    end
-    local parts = vim.split(path, '/')
-    return table.concat(parts, '/', 1, #parts == 1 and 1 or #parts - 1)
-end
 
 ---Get current buffer's closest directory
 ---@return string
 function utils.buffer_cwd()
-    local buf_path = vim.fn.expand('%')
-    return utils.dirname(buf_path)
+    local buf_path = vim.api.nvim_buf_get_name(0)
+    if vim.fn.isdirectory(buf_path) == 1 then
+        return buf_path
+    end
+    return vim.fs.dirname(buf_path)
 end
 ---@return PackageJson|nil
 function utils.get_root_package_json()
-    -- process cwd
-    local cwd = vim.fn.getcwd()
-    local filepath = cwd .. '/package.json'
+    local filepath = vim.fn.getcwd() .. '/package.json'
 
     if vim.fn.file_readable(filepath) == 0 then
         return nil
@@ -86,44 +77,39 @@ function utils.get_root_package_json()
 end
 ---@return PackageJson|nil
 function utils.get_closest_package_json()
-    local cwd = utils.buffer_cwd()
-    local paths = vim.split(cwd, '/')
-
-    for i, _ in ipairs(paths) do
-        local startIndex = #paths == 1 and 1 or #paths - i
-        local filepath = table.concat(paths, '/', 1, startIndex) .. '/package.json'
-        if vim.fn.file_readable(filepath) == 1 then
-            local lines = vim.fn.readfile(filepath)
-            return {
-                filepath = filepath,
-                json = vim.json.decode(table.concat(lines, '')),
-            }
-        end
+    local files = vim.fs.find(
+        { 'package.json'},
+        { upward = true, type = 'file', stop = vim.fs.dirname(vim.env.HOME), limit = 1, path = utils.buffer_cwd() }
+    )
+    if #files > 0 then
+        local lines = vim.fn.readfile(files[1])
+        return {
+            filepath = files[1],
+            json = vim.json.decode(table.concat(lines, '')),
+        }
     end
-
-    return nil
 end
 
 ---@return 'npm' | 'yarn' | 'pnpm' | 'bun'
 function utils.infer_package_manager()
-    local cwd = utils.buffer_cwd()
-    local paths = vim.split(cwd, '/')
-
-    for i, _ in ipairs(paths) do
-        local startIndex = #paths == 1 and 1 or #paths - i
-        local filepath = table.concat(paths, '/', 1, startIndex)
-        if vim.fn.file_readable(filepath .. '/package-lock.json') == 1 then
-            return 'npm'
-        end
-        if vim.fn.file_readable(filepath .. '/yarn.lock') == 1 then
-            return 'yarn'
-        end
-        if vim.fn.file_readable(filepath .. '/pnpm-lock.yaml') == 1 then
-            return 'pnpm'
-        end
-        if vim.fn.file_readable(filepath .. '/bun.lockb') == 1 then
-            return 'bun'
-        end
+    local lock_file_to_manager = {
+        ['package-lock.json'] = 'npm',
+        ['yarn.lock'] = 'yarn',
+        ['pnpm-lock.yaml'] = 'pnpm',
+        ['bun.lock'] = 'bun',
+    }
+    local lock_files = vim.fs.find(
+        vim.tbl_keys(lock_file_to_manager),
+        {
+            upward = true,
+            type = 'file',
+            stop = vim.fs.dirname(vim.env.HOME),
+            limit = 1,
+            path = utils.buffer_cwd(),
+        }
+    )
+    if #lock_files > 0 then
+        return lock_file_to_manager[vim.fs.basename(lock_files[1])]
     end
 
     return 'npm'
@@ -137,19 +123,16 @@ function M.run_script(opts)
 
     local config = utils.get_root_package_json()
     if config == nil then
-        print('package.json not found')
-        return nil
+        return vim.notify('Could not locate package.json', vim.log.levels.WARN)
     end
     if config.json.scripts == nil then
-        print('No "scripts" in package.json')
-        return nil
+        return vim.notify('No "scripts" in package.json', vim.log.levels.WARN)
     end
 
     local script_names = vim.fn.keys(config.json.scripts)
 
     if #script_names == 0 then
-        print('Empty "scripts" in package.json')
-        return nil
+        return vim.notify('Empty "scripts" in package.json', vim.log.levels.WARN)
     end
 
     opts.select(script_names, {
@@ -173,13 +156,11 @@ function M.run_workspace_script(opts)
 
     local root_config = utils.get_root_package_json()
     if root_config == nil then
-        print('no root package.json')
-        return nil
+        return vim.notify('Could not locate package.json', vim.log.levels.WARN)
     end
 
     if root_config.json.workspaces == nil then
-        print('no "workspaces" in package.json')
-        return nil
+        return vim.notify('No "workspaces" in package.json', vim.log.levels.WARN)
     end
 
     -- { [name] = {filepath, json} }
@@ -232,9 +213,8 @@ function M.run_workspace_script(opts)
         }, function(workspace_name)
             local workspace_scripts = workspaces[workspace_name].json.scripts
 
-            if workspace_scripts == nil or #vim.fn.keys(workspace_scripts) == 0 then
-                print('No "scripts" in workspace package.json')
-                return nil
+            if workspace_scripts == nil or vim.tbl_isempty(workspace_scripts) then
+                return vim.notify('No "scripts" in workspace package.json', vim.log.levels.WARN)
             end
 
             opts.select(vim.fn.keys(workspace_scripts), {
@@ -261,13 +241,11 @@ function M.run_buffer_script(opts)
     local config = utils.get_closest_package_json()
 
     if not config then
-        print('Could not locate package.json')
-        return nil
+        return vim.notify('Could not locate package.json', vim.log.levels.WARN)
     end
 
     if not config.json.scripts then
-        print('package.json does not have "scripts"')
-        return nil
+        return vim.notify('package.json does not have "scripts"', vim.log.levels.WARN)
     end
 
     opts.select(vim.fn.keys(config.json.scripts), {
@@ -279,7 +257,7 @@ function M.run_buffer_script(opts)
     }, function(name)
         opts.run_script({
             name = name,
-            path = utils.dirname(config.filepath),
+            path = vim.fs.dirname(config.filepath),
             package_manager = opts.package_manager,
         })
     end)
@@ -294,6 +272,13 @@ function M.run_from_all(opts)
     local out = vim.fn.system({ 'fd', '-E', 'node_modules', '-t', 'f', 'package.json', '.' })
     out = vim.trim(out)
     local lines = vim.split(out, '\n')
+    lines = vim.tbl_filter(function(line)
+        return line ~= ''
+    end, lines)
+
+    if #lines == 0 then
+        return vim.notify('No package.json files found', vim.log.levels.WARN)
+    end
 
     local failed_to_parse = {}
     local package_jsons = vim.tbl_map(function(filepath)
@@ -326,7 +311,7 @@ function M.run_from_all(opts)
                 label = label,
                 script_name = script_name,
                 script_value = script,
-                path = utils.dirname(package_json.filepath),
+                path = vim.fs.dirname(package_json.filepath),
             }
             table.insert(flatten_scripts, script_obj)
         end
