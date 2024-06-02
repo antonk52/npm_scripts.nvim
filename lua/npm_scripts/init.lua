@@ -45,7 +45,9 @@ function utils.get_opts(local_options)
         workspace_script_solo_picker = true,
         ---@type fun(opts: NpmScripts.RunScriptOpts): nil
         run_script = function(opts)
-            vim.cmd('vs | term cd ' .. opts.path .. ' && ' .. opts.package_manager .. ' run ' .. opts.name)
+            vim.cmd('tabnew | term cd ' .. opts.path .. ' && ' .. opts.package_manager .. ' run ' .. opts.name)
+            -- rename buffer
+            vim.cmd.file(opts.package_manager .. ':' .. opts.name)
         end,
     }
     local result = {}
