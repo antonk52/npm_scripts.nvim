@@ -1,12 +1,20 @@
----@class PackageJson
+---@class NpmScripts.PackageJson
 ---@field json table<string, string|table<string,string>>
 ---@field filepath string
+
+---@alias NpmScripts.PackageManager 'npm' | 'yarn' | 'pnpm' | 'bun'
+
+---@class NpmScripts.RunScriptOpts
+---@field name string script name from package json
+---@field path string cwd for command to execute
+---@field package_manager NpmScripts.PackageManager the binary to run the script
+
 
 local GLOBAL_OPTIONS = {}
 local M = {}
 
 ---Override default plugin options
----@param opts PluginOptions
+---@param opts NpmScripts.PluginOptions
 ---@return nil
 function M.setup(opts)
     for k, v in pairs(opts) do
@@ -16,10 +24,10 @@ end
 
 local utils = {}
 ---Infer options
----@param local_options PluginOptions
----@return PluginOptions
+---@param local_options NpmScripts.PluginOptions
+---@return NpmScripts.PluginOptions
 function utils.get_opts(local_options)
-    ---@class PluginOptions
+    ---@class NpmScripts.PluginOptions
     local DEFAULT_OPTIONS = {
         select = vim.ui.select,
 
@@ -29,14 +37,13 @@ function utils.get_opts(local_options)
         select_workspace_prompt = 'Select a workspace to run a script:',
         select_workspace_format_item = tostring,
 
+        ---@type NpmScripts.PackageManager
         package_manager = local_options.package_manager or utils.infer_package_manager(),
 
         -- whether to pick a workspace script via a single search
         -- or two searches, over workspaces and picked workspace scripts
         workspace_script_solo_picker = true,
-        -- opts.script_name string
-        -- opts.path string where command should be executed
-        -- opts.package_manager string the binary to run the script ie 'npm' | 'yarn' | 'pnpm' | 'bun'
+        ---@type fun(opts: NpmScripts.RunScriptOpts): nil
         run_script = function(opts)
             vim.cmd('vs | term cd ' .. opts.path .. ' && ' .. opts.package_manager .. ' run ' .. opts.name)
         end,
@@ -60,7 +67,7 @@ function utils.buffer_cwd()
     end
     return vim.fs.dirname(buf_path)
 end
----@return PackageJson|nil
+---@return NpmScripts.PackageJson?
 function utils.get_root_package_json()
     local filepath = vim.fn.getcwd() .. '/package.json'
 
@@ -75,7 +82,7 @@ function utils.get_root_package_json()
         json = vim.json.decode(content),
     }
 end
----@return PackageJson|nil
+---@return NpmScripts.PackageJson?
 function utils.get_closest_package_json()
     local files = vim.fs.find(
         { 'package.json'},
@@ -116,7 +123,7 @@ function utils.infer_package_manager()
 end
 
 ---Run a script from project's package.json
----@param opts PluginOptions|nil
+---@param opts NpmScripts.PluginOptions|nil
 ---@return nil
 function M.run_script(opts)
     opts = utils.get_opts(opts or {})
@@ -149,7 +156,7 @@ function M.run_script(opts)
 end
 
 ---Run a script from a specific workspace
----@param opts PluginOptions|nil
+---@param opts NpmScripts.PluginOptions?
 ---@return nil
 function M.run_workspace_script(opts)
     opts = utils.get_opts(opts or {})
@@ -164,23 +171,26 @@ function M.run_workspace_script(opts)
     end
 
     -- { [name] = {filepath, json} }
-    ---@type table<string, PackageJson>
+    ---@type table<string, NpmScripts.PackageJson>
     local workspaces = {}
 
-    for _, glob in pairs(root_config.json.workspaces) do
-        local items = vim.split(vim.fn.glob(glob), '\n')
+    local raw_root_workspaces = root_config.json.workspaces
+    if type(raw_root_workspaces) == 'table' then
+        for _, glob in pairs(raw_root_workspaces) do
+            local items = vim.split(vim.fn.glob(glob), '\n')
 
-        for _, item in ipairs(items) do
-            local package_json_filepath = item .. '/package.json'
+            for _, item in ipairs(items) do
+                local package_json_filepath = item .. '/package.json'
 
-            if item ~= '' and vim.fn.file_readable(package_json_filepath) == 1 then
-                local workspace_json_lines = vim.fn.readfile(package_json_filepath)
-                local workspace_json = vim.json.decode(table.concat(workspace_json_lines, ''))
+                if item ~= '' and vim.fn.file_readable(package_json_filepath) == 1 then
+                    local workspace_json_lines = vim.fn.readfile(package_json_filepath)
+                    local workspace_json = vim.json.decode(table.concat(workspace_json_lines, ''))
 
-                workspaces[workspace_json.name] = {
-                    filepath = item,
-                    json = workspace_json,
-                }
+                    workspaces[workspace_json.name] = {
+                        filepath = item,
+                        json = workspace_json,
+                    }
+                end
             end
         end
     end
@@ -188,8 +198,11 @@ function M.run_workspace_script(opts)
     if opts.workspace_script_solo_picker then
         local items = {}
         for workspace_name, w in pairs(workspaces) do
-            for script_name, _ in pairs(w.json.scripts or {}) do
-                table.insert(items, workspace_name .. '  ' .. script_name)
+            local scripts = w.json.scripts or {}
+            if type(scripts) == 'table' then
+                for script_name, _ in pairs(scripts) do
+                    table.insert(items, workspace_name .. '  ' .. script_name)
+                end
             end
         end
 
@@ -233,7 +246,7 @@ function M.run_workspace_script(opts)
 end
 
 ---Run a script from current buffer's package
----@param opts PluginOptions|nil
+---@param opts NpmScripts.PluginOptions|nil
 ---@return nil
 function M.run_buffer_script(opts)
     opts = utils.get_opts(opts or {})
@@ -264,7 +277,7 @@ function M.run_buffer_script(opts)
 end
 
 ---Find all package.json files from cwd and select a script across all of them
----@param opts PluginOptions|nil
+---@param opts NpmScripts.PluginOptions|nil
 ---@return nil
 function M.run_from_all(opts)
     opts = utils.get_opts(opts or {})
