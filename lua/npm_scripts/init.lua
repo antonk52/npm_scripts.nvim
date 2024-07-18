@@ -73,7 +73,7 @@ end
 function utils.get_root_package_json()
     local filepath = vim.fn.getcwd() .. '/package.json'
 
-    if vim.fn.file_readable(filepath) == 0 then
+    if vim.fn.filereadable(filepath) == 0 then
         return nil
     end
 
@@ -86,14 +86,14 @@ function utils.get_root_package_json()
 end
 ---@return NpmScripts.PackageJson?
 function utils.get_closest_package_json()
-    local files = vim.fs.find(
+    local file = vim.fs.find(
         { 'package.json'},
         { upward = true, type = 'file', stop = vim.fs.dirname(vim.env.HOME), limit = 1, path = utils.buffer_cwd() }
-    )
-    if #files > 0 then
-        local lines = vim.fn.readfile(files[1])
+    )[1]
+    if file then
+        local lines = vim.fn.readfile(file)
         return {
-            filepath = files[1],
+            filepath = file,
             json = vim.json.decode(table.concat(lines, '')),
         }
     end
@@ -107,7 +107,7 @@ function utils.infer_package_manager()
         ['pnpm-lock.yaml'] = 'pnpm',
         ['bun.lock'] = 'bun',
     }
-    local lock_files = vim.fs.find(
+    local lock_file = vim.fs.find(
         vim.tbl_keys(lock_file_to_manager),
         {
             upward = true,
@@ -116,9 +116,9 @@ function utils.infer_package_manager()
             limit = 1,
             path = utils.buffer_cwd(),
         }
-    )
-    if #lock_files > 0 then
-        return lock_file_to_manager[vim.fs.basename(lock_files[1])]
+    )[1]
+    if lock_file then
+        return lock_file_to_manager[vim.fs.basename(lock_file)]
     end
 
     return 'npm'
@@ -184,7 +184,7 @@ function M.run_workspace_script(opts)
             for _, item in ipairs(items) do
                 local package_json_filepath = item .. '/package.json'
 
-                if item ~= '' and vim.fn.file_readable(package_json_filepath) == 1 then
+                if item ~= '' and vim.fn.filereadable(package_json_filepath) == 1 then
                     local workspace_json_lines = vim.fn.readfile(package_json_filepath)
                     local workspace_json = vim.json.decode(table.concat(workspace_json_lines, ''))
 
@@ -284,32 +284,33 @@ end
 function M.run_from_all(opts)
     opts = utils.get_opts(opts or {})
 
-    local out = vim.fn.system({ 'fd', '-E', 'node_modules', '-t', 'f', 'package.json', '.' })
-    out = vim.trim(out)
-    local lines = vim.split(out, '\n')
-    lines = vim.tbl_filter(function(line)
+    local filepaths_str = vim.fn.system({ 'fd', '-E', 'node_modules', '-t', 'f', 'package.json', '.' })
+    local filepaths = vim.split(vim.trim(filepaths_str), '\n')
+    filepaths = vim.tbl_filter(function(line)
         return line ~= ''
-    end, lines)
+    end, filepaths)
 
-    if #lines == 0 then
+    if #filepaths == 0 then
         return vim.notify('No package.json files found', vim.log.levels.WARN)
     end
 
+    ---@type string[]
     local failed_to_parse = {}
-    local package_jsons = vim.tbl_map(function(filepath)
+    ---@type {filepath: string, name: string, scripts: table}[]
+    local package_jsons = {}
+    for _, filepath in ipairs(filepaths) do
         local content = vim.fn.readfile(filepath)
         local success, result = pcall(vim.json.decode, table.concat(content, ''))
         if success then
-            return {
+            table.insert(package_jsons,{
                 filepath = filepath,
                 name = result.name or 'unknown',
                 scripts = result.scripts or {},
-            }
+            })
         else
             table.insert(failed_to_parse, filepath)
-            return nil
         end
-    end, lines)
+    end
 
     if #failed_to_parse > 0 then
         vim.notify('Failed to parse package.json files: ' .. table.concat(failed_to_parse, '; '), vim.log.levels.WARN)
@@ -317,10 +318,8 @@ function M.run_from_all(opts)
 
     local flatten_scripts = {}
     for _, package_json in ipairs(package_jsons) do
-        if package_json == nil then
-            goto continue
-        end
-        for script_name, script in pairs(package_json.scripts) do
+        local scripts = (package_json or {}).scripts or {}
+        for script_name, script in pairs(scripts) do
             local label = package_json.name .. ': ' .. script_name
             local script_obj = {
                 label = label,
@@ -330,7 +329,6 @@ function M.run_from_all(opts)
             }
             table.insert(flatten_scripts, script_obj)
         end
-        ::continue::
     end
 
     opts.select(flatten_scripts, {
