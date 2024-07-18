@@ -13,6 +13,8 @@
 local GLOBAL_OPTIONS = {}
 local M = {}
 
+local uv = vim.uv or vim.loop
+
 ---Override default plugin options
 ---@param opts NpmScripts.PluginOptions
 ---@return nil
@@ -278,17 +280,47 @@ function M.run_buffer_script(opts)
     end)
 end
 
+-- Traverses fs from cwd to find package.json files excluding node_modules
+---@return string[]
+local function find_package_jsons()
+    local package_jsons = {}
+    local cwd = uv.cwd() or vim.fn.getcwd()
+    local function search_recursively(path)
+        ---@diagnostic disable-next-line: param-type-mismatch
+        local dir = uv.fs_opendir(path, nil, 10000)
+        if not dir then
+            return
+        end
+        local items = uv.fs_readdir(dir)
+        uv.fs_closedir(dir)
+        if not items then
+            return
+        end
+        for _, item in ipairs(items) do
+            if item.name ~= 'node_modules' then
+                local abs_path = path .. '/' .. item.name
+                local stat = uv.fs_stat(abs_path)
+                if stat then
+                    if stat.type == 'directory' then
+                        search_recursively(abs_path)
+                    elseif stat.type == 'file' and item.name == 'package.json' then
+                        table.insert(package_jsons, abs_path)
+                    end
+                end
+            end
+        end
+    end
+    search_recursively(cwd)
+    return package_jsons
+end
+
 ---Find all package.json files from cwd and select a script across all of them
 ---@param opts NpmScripts.PluginOptions|nil
 ---@return nil
 function M.run_from_all(opts)
     opts = utils.get_opts(opts or {})
 
-    local filepaths_str = vim.fn.system({ 'fd', '-E', 'node_modules', '-t', 'f', 'package.json', '.' })
-    local filepaths = vim.split(vim.trim(filepaths_str), '\n')
-    filepaths = vim.tbl_filter(function(line)
-        return line ~= ''
-    end, filepaths)
+    local filepaths = find_package_jsons()
 
     if #filepaths == 0 then
         return vim.notify('No package.json files found', vim.log.levels.WARN)
