@@ -47,9 +47,19 @@ function utils.get_opts(local_options)
         workspace_script_solo_picker = true,
         ---@type fun(opts: NpmScripts.RunScriptOpts): nil
         run_script = function(opts)
-            vim.cmd('tabnew | term cd ' .. opts.path .. ' && ' .. opts.package_manager .. ' run ' .. opts.name)
-            -- rename buffer
-            vim.cmd.file(opts.package_manager .. ':' .. opts.name)
+            local cmd = string.format('cd %s && %s run %s', opts.path, opts.package_manager, opts.name)
+            if vim.g.vscode ~= nil then
+                local code = require('vscode')
+                code.call('workbench.action.terminal.new')
+                code.call('workbench.action.terminal.sendSequence', {
+                    args = { text = cmd .. '\n' }
+                })
+                return
+            else
+                vim.cmd('tabnew | term ' .. cmd)
+                -- rename buffer
+                vim.cmd.file(opts.package_manager .. ':' .. opts.name)
+            end
         end,
     }
     local result = {}

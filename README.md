@@ -7,6 +7,7 @@ Features:
 - Workspace support
 - Run a script from the current buffer's project(monorepo)
 - Uses `vim.ui.select()` for a picker which makes it easy to seamlessly integrate with your setup(telescope/fzf or anything else). See [`opts.select`](#opts.select)
+- [vscode-neovim](https://github.com/vscode-neovim/vscode-neovim) support
 
 <center>
 
