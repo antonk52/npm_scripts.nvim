@@ -292,7 +292,7 @@ end
 
 -- Traverses fs from cwd to find package.json files excluding node_modules
 ---@return string[]
-local function find_package_jsons()
+local function find_package_jsons_with_uv()
     local package_jsons = {}
     local cwd = uv.cwd() or vim.fn.getcwd()
     local function search_recursively(path)
@@ -324,13 +324,30 @@ local function find_package_jsons()
     return package_jsons
 end
 
+---@return string[]
+local function find_package_jsons_with_fd()
+    local cwd = uv.cwd() or vim.fn.getcwd()
+    local command = {'fd', '--glob', 'package.json', '--type', 'f', '--exclude', 'node_modules', '--color', 'never'}
+    local obj = vim.system(command, {text = true, cwd = cwd}):wait()
+
+    assert(obj.code == 0, 'fd failed with code ' .. obj.code)
+
+    local out = vim.trim(obj.stdout)
+    return out == '' and {} or vim.split(out, '\n')
+end
+
 ---Find all package.json files from cwd and select a script across all of them
 ---@param opts NpmScripts.PluginOptions|nil
 ---@return nil
 function M.run_from_all(opts)
     opts = utils.get_opts(opts or {})
 
-    local filepaths = find_package_jsons()
+    local filepaths = {}
+    if vim.fn.executable('fd') == 1 then
+        filepaths = find_package_jsons_with_fd()
+    else
+        filepaths = find_package_jsons_with_uv()
+    end
 
     if #filepaths == 0 then
         return vim.notify('No package.json files found', vim.log.levels.WARN)
