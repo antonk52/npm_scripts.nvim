@@ -336,6 +336,28 @@ local function find_package_jsons_with_fd()
     return out == '' and {} or vim.split(out, '\n')
 end
 
+local function read_file_lines(filepath, cb)
+    uv.fs_open(filepath, 'r', 438, function(fd_err, fd)
+        if fd_err or not fd then
+            return cb(nil, filepath)
+        end
+        uv.fs_fstat(fd, function(stat_err, stat)
+            if stat_err or not stat then
+                return cb(nil, filepath)
+            end
+            uv.fs_read(fd, stat.size, 0, function(read_err, content)
+                if read_err or not content then
+                    return cb(nil, filepath)
+                end
+
+                cb(content, filepath)
+
+                uv.fs_close(fd)
+            end)
+        end)
+    end)
+end
+
 ---Find all package.json files from cwd and select a script across all of them
 ---@param opts NpmScripts.PluginOptions|nil
 ---@return nil
@@ -357,55 +379,72 @@ function M.run_from_all(opts)
     local failed_to_parse = {}
     ---@type {filepath: string, name: string, scripts: table}[]
     local package_jsons = {}
-    for _, filepath in ipairs(filepaths) do
-        local content = vim.fn.readfile(filepath)
-        local success, result = pcall(vim.json.decode, table.concat(content, ''))
-        if success then
-            table.insert(package_jsons,{
-                filepath = filepath,
-                name = result.name or 'unknown',
-                scripts = result.scripts or {},
+
+    local function select_script()
+        if #failed_to_parse > 0 then
+            vim.notify(
+                'Failed to parse package.json files: ' .. table.concat(failed_to_parse, '; '),
+                vim.log.levels.WARN
+            )
+        end
+
+        local flatten_scripts = {}
+        for _, package_json in ipairs(package_jsons) do
+            local scripts = (package_json or {}).scripts or {}
+            for script_name, script in pairs(scripts) do
+                local label = package_json.name .. ': ' .. script_name
+                local script_obj = {
+                    label = label,
+                    script_name = script_name,
+                    script_value = script,
+                    path = vim.fs.dirname(package_json.filepath),
+                }
+                table.insert(flatten_scripts, script_obj)
+            end
+        end
+
+        opts.select(flatten_scripts, {
+            prompt = opts.select_script_prompt,
+            kind = 'string',
+            format_item = function(script)
+                return script.label
+            end,
+        }, function(script)
+            if script == nil then
+                return vim.notify('No script selected', vim.log.levels.INFO)
+            end
+            opts.run_script({
+                name = script.script_name,
+                path = script.path,
+                package_manager = opts.package_manager,
             })
-        else
+        end)
+    end
+
+    local function file_read_callback(content, filepath)
+        if not content then
             table.insert(failed_to_parse, filepath)
+        else
+            local success, result = pcall(vim.json.decode, content)
+            if success then
+                table.insert(package_jsons, {
+                    filepath = filepath,
+                    name = result.name or 'unknown',
+                    scripts = result.scripts or {},
+                })
+            else
+                table.insert(failed_to_parse, filepath)
+            end
+        end
+
+        if (#package_jsons + #failed_to_parse) == #filepaths then
+            vim.schedule(select_script)
         end
     end
 
-    if #failed_to_parse > 0 then
-        vim.notify('Failed to parse package.json files: ' .. table.concat(failed_to_parse, '; '), vim.log.levels.WARN)
+    for _, filepath in ipairs(filepaths) do
+        read_file_lines(filepath, file_read_callback)
     end
-
-    local flatten_scripts = {}
-    for _, package_json in ipairs(package_jsons) do
-        local scripts = (package_json or {}).scripts or {}
-        for script_name, script in pairs(scripts) do
-            local label = package_json.name .. ': ' .. script_name
-            local script_obj = {
-                label = label,
-                script_name = script_name,
-                script_value = script,
-                path = vim.fs.dirname(package_json.filepath),
-            }
-            table.insert(flatten_scripts, script_obj)
-        end
-    end
-
-    opts.select(flatten_scripts, {
-        prompt = opts.select_script_prompt,
-        kind = 'string',
-        format_item = function(script)
-            return script.label
-        end,
-    }, function(script)
-        if script == nil then
-            return vim.notify('No script selected', vim.log.levels.INFO)
-        end
-        opts.run_script({
-            name = script.script_name,
-            path = script.path,
-            package_manager = opts.package_manager,
-        })
-    end)
 end
 
 return M
