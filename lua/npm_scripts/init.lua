@@ -57,8 +57,15 @@ function utils.get_opts(local_options)
                 return
             else
                 vim.cmd('tabnew | term ' .. cmd)
-                -- rename buffer
-                vim.cmd.file(opts.package_manager .. ':' .. opts.name)
+                -- rename buffer, ensuring uniqueness
+                local base_name = opts.package_manager .. ':' .. opts.name
+                local final_name = base_name
+                local i = 2
+                while vim.fn.bufexists(final_name) == 1 do
+                    final_name = base_name .. '_' .. i
+                    i = i + 1
+                end
+                vim.cmd.file(final_name)
             end
         end,
     }
